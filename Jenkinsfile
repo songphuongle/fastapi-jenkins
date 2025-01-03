@@ -15,7 +15,7 @@ pipeline {
             steps {
                 sh '''
                 python3 -m venv venv
-                source venv/bin/activate
+                . venv/bin/activate
                 pip install -r requirements.txt
                 '''
             }
@@ -24,7 +24,7 @@ pipeline {
         stage('Run API') {
             steps {
                 sh '''
-                source venv/bin/activate
+                . venv/bin/activate
                 nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
                 '''
             }
@@ -33,7 +33,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                source venv/bin/activate
+                . venv/bin/activate
                 pytest --junitxml=results.xml
                 '''
             }
@@ -42,10 +42,14 @@ pipeline {
 
     post {
         success {
-            publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.SUCCESS
+            script {
+                publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.SUCCESS
+            }
         }
         failure {
-            publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.FAILURE
+            script {
+                publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.FAILURE
+            }
         }
     }
 }
