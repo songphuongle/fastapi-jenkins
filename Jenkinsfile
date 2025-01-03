@@ -1,51 +1,48 @@
 pipeline {
     agent any
+
     stages {
         stage('Clone Repo') {
             steps {
-                script {
-                    // Clone the repository
-                    checkout scm
-                }
+                git credentialsId: 'jenkinsw4', url: 'https://github.com/songphuongle/fastapi-jenkins.git'
             }
         }
-        stage('Install Dependencies') {
+
+        stage('Setup Python Environment') {
             steps {
-                script {
-                    // Install dependencies
-                    sh 'pip3 install --user -r requirements.txt'
-                }
+                sh '''
+                python3 -m venv venv
+                source venv/bin/activate
+                pip install -r requirements.txt
+                '''
             }
         }
+
         stage('Run API') {
             steps {
-                script {
-                    // Run FastAPI application
-                    sh 'nohup uvicorn main:app --host 0.0.0.0 --port 8000 &'
-                }
+                sh '''
+                source venv/bin/activate
+                nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+                '''
             }
         }
+
         stage('Run Tests') {
             steps {
-                script {
-                    // Run the test suite
-                    sh 'pytest test_main.py'
-                }
+                sh '''
+                source venv/bin/activate
+                pytest --junitxml=results.xml
+                '''
             }
         }
     }
+
     post {
-        always {
-            // Publish the test status using GitHub Checks plugin
-            publishChecks name: 'API Tests', summary: 'Tests Completed'
+        success {
+            publishChecks name: 'API Tests', status: 'completed', conclusion: 'success'
         }
         failure {
-            // Send a message or take any action on failure
-            echo 'Build failed. Check logs for details.'
-        }
-        success {
-            // Action on success
-            echo 'Build succeeded.'
+            publishChecks name: 'API Tests', status: 'completed', conclusion: 'failure'
         }
     }
 }
