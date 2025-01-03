@@ -1,3 +1,6 @@
+import io.jenkins.plugins.checks.api.ChecksStatus
+import io.jenkins.plugins.checks.api.ChecksConclusion
+
 pipeline {
     agent any
 
@@ -39,10 +42,10 @@ pipeline {
 
     post {
         success {
-            publishChecks name: 'API Tests', status: 'completed', conclusion: 'success'
+            publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.SUCCESS
         }
         failure {
-            publishChecks name: 'API Tests', status: 'completed', conclusion: 'failure'
+            publishChecks name: 'API Tests', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.FAILURE
         }
     }
 }
