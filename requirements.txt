@@ -1,2 +1,4 @@
-fastapi
-unicorn
+fastapi==0.95.2
+uvicorn==0.21.1
+pytest==7.4.0
+requests==2.31.0
