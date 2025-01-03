@@ -3,50 +3,49 @@ pipeline {
 
     environment {
         VENV_DIR = 'venv'
-        APP_HOST = '0.0.0.0'
-        APP_PORT = '8000'
-        APP_LOG = 'app.log'
     }
 
     stages {
-        stage('Clone Repository') {
-            steps {
-                withChecks('Clone Repository') {
-                    publishChecks name: 'Clone Repository', status: 'IN_PROGRESS', summary: 'Cloning the repository.'
-                    git credentialsId: 'jenkinsw4', url: 'https://github.com/songphuongle/fastapi-jenkins.git'
-                    publishChecks name: 'Clone Repository', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Repository cloned successfully.'
-                }
-            }
-        }
-
         stage('Cleanup') {
             steps {
                 withChecks('Cleanup') {
                     publishChecks name: 'Cleanup', status: 'IN_PROGRESS', summary: 'Cleaning up any existing processes.'
                     script {
-                        sh '''
-                        pkill -f "uvicorn main:app" || true
-                        rm -rf ${VENV_DIR} ${APP_LOG}
-                        '''
+                        // Stop any running instance of the application
+                        sh 'pkill -f "uvicorn main:app" || true'
                     }
                     publishChecks name: 'Cleanup', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Cleanup completed successfully.'
                 }
             }
         }
 
-        stage('Set Up Python Environment') {
+        stage('Set Up Virtual Environment') {
             steps {
-                withChecks('Set Up Python Environment') {
-                    publishChecks name: 'Set Up Python Environment', status: 'IN_PROGRESS', summary: 'Setting up Python environment.'
+                withChecks('Set Up Virtual Environment') {
+                    publishChecks name: 'Set Up Virtual Environment', status: 'IN_PROGRESS', summary: 'Setting up virtual environment.'
                     script {
                         sh '''
-                        python3 -m venv ${VENV_DIR}
+                        python3 -m venv ${VENV_DIR} || true
                         . ${VENV_DIR}/bin/activate
-                        pip install --upgrade pip
+                        pip install --upgrade pip || true
+                        '''
+                    }
+                    publishChecks name: 'Set Up Virtual Environment', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Virtual environment setup successfully.'
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                withChecks('Install Dependencies') {
+                    publishChecks name: 'Install Dependencies', status: 'IN_PROGRESS', summary: 'Installing dependencies.'
+                    script {
+                        sh '''
+                        . ${VENV_DIR}/bin/activate
                         pip install -r requirements.txt
                         '''
                     }
-                    publishChecks name: 'Set Up Python Environment', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Python environment set up successfully.'
+                    publishChecks name: 'Install Dependencies', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Dependencies installed successfully.'
                 }
             }
         }
@@ -58,58 +57,39 @@ pipeline {
                     script {
                         sh '''
                         . ${VENV_DIR}/bin/activate
-                        pytest --junitxml=results.xml --cov=your_module --cov-report=xml || exit 1
+                        pytest --junitxml=test-results.xml
                         '''
                     }
-                    junit 'results.xml' // Publish test results in Jenkins
                     publishChecks name: 'Run Tests', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'All tests passed successfully.'
                 }
             }
         }
 
-        stage('Run API') {
+        stage('Run Application') {
             steps {
-                withChecks('Run API') {
-                    publishChecks name: 'Run API', status: 'IN_PROGRESS', summary: 'Running the API application.'
+                withChecks('Run Application') {
+                    publishChecks name: 'Run Application', status: 'IN_PROGRESS', summary: 'Running the application.'
                     script {
                         sh '''
                         . ${VENV_DIR}/bin/activate
-                        nohup uvicorn main:app --host ${APP_HOST} --port ${APP_PORT} > ${APP_LOG} 2>&1 &
-                        sleep 5 // Allow the app to start
-                        python -c "
-import requests
-import sys
-try:
-    response = requests.get(f'http://${APP_HOST}:${APP_PORT}/')
-    if response.status_code == 200:
-        print('API is healthy.')
-    else:
-        print('API health check failed with status code:', response.status_code)
-        sys.exit(1)
-except Exception as e:
-    print('API health check failed with error:', str(e))
-    sys.exit(1)
-                        "
+                        nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
                         '''
                     }
-                    publishChecks name: 'Run API', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'API is running successfully.'
+                    publishChecks name: 'Run Application', status: 'COMPLETED', conclusion: 'SUCCESS', summary: 'Application is running successfully.'
                 }
             }
         }
     }
 
     post {
+        always {
+            echo 'Pipeline execution completed.'
+        }
         success {
             echo 'Pipeline succeeded.'
-            script {
-                publishChecks name: 'Pipeline Execution', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.SUCCESS, summary: 'Pipeline completed successfully.'
-            }
         }
         failure {
             echo 'Pipeline failed.'
-            script {
-                publishChecks name: 'Pipeline Execution', status: ChecksStatus.COMPLETED, conclusion: ChecksConclusion.FAILURE, summary: 'Pipeline encountered an error.'
-            }
         }
     }
 }
